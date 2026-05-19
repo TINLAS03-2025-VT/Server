@@ -22,7 +22,7 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Add the ROS 2 version of Unity's ROS-TCP-Endpoint.
-RUN git clone --depth 1 --branch ROS2v0.7.0 \
+RUN git clone --depth 1 --branch main-ros2 \
     https://github.com/Unity-Technologies/ROS-TCP-Endpoint.git \
     /ros_ws/src/ROS-TCP-Endpoint
 
