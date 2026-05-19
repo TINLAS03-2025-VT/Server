@@ -6,7 +6,23 @@ This container runs the ROS-TCP-Endpoint so Unity can connect to the ROS 2 serve
 
 ## Run the server
 
-Create or use the provided compose.yaml file, then run:
+
+Create or use the provided compose.yaml file
+
+``` yaml
+
+services:
+  jacht-ros-server:
+    image: ghcr.io/tinlas03-2025-vt/server:latest
+    container_name: jacht-ros-server
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=42
+    ports:
+      - "10000:10000/tcp"
+```
+
+then run:
 
     docker compose pull
     docker compose up -d
