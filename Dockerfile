@@ -31,6 +31,9 @@ RUN source /opt/ros/humble/setup.bash && \
     rosdep install --from-paths src -y --ignore-src --rosdistro humble && \
     colcon build --merge-install
 
+RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
+    echo "[ -f /ros_ws/install/setup.bash ] && source /ros_ws/install/setup.bash" >> /root/.bashrc
+
 ENTRYPOINT ["/entrypoint.sh"]
 
 CMD ["ros2", "run", "ros_tcp_endpoint", "default_server_endpoint", "--ros-args", "-p", "ROS_IP:=0.0.0.0", "-p", "ROS_TCP_PORT:=10000"]

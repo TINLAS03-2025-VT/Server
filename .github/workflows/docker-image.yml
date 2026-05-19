@@ -6,9 +6,23 @@ on:
       - main
     tags:
       - "v*.*.*"
+    paths:
+      - "Dockerfile"
+      - "entrypoint.sh"
+      - "ros_ws/src/**"
+      - "compose.yaml"
+      - "compose.dev.yaml"
+      - ".github/workflows/docker-image.yml"
   pull_request:
     branches:
       - main
+    paths:
+      - "Dockerfile"
+      - "entrypoint.sh"
+      - "ros_ws/src/**"
+      - "compose.yaml"
+      - "compose.dev.yaml"
+      - ".github/workflows/docker-image.yml"
 
 env:
   IMAGE_NAME: ghcr.io/tinlas03-2025-vt/server
