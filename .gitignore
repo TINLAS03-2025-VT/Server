@@ -1,0 +1,11 @@
+build/
+install/
+log/
+ros_ws/build/
+ros_ws/install/
+ros_ws/log/
+*.pyc
+__pycache__/
+.vscode/
+.idea/
+.DS_Store

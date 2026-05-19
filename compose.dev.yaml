@@ -1,0 +1,15 @@
+services:
+  jacht-ros-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: jacht-ros-server:dev
+    container_name: jacht-ros-dev
+    environment:
+      - ROS_DOMAIN_ID=42
+    ports:
+      - "10000:10000/tcp"
+    volumes:
+      - ./ros_ws:/ros_ws
+    working_dir: /ros_ws
+    command: bash
