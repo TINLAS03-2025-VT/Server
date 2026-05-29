@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     iputils-ping \
     net-tools \
+    ros-humble-rmw-cyclonedds-cpp \
+    iproute2 \
+    iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /ros_ws
