@@ -1,0 +1,204 @@
+--- a/.github/workflows/docker-image.yml
++++ b/.github/workflows/docker-image.yml
+@@ -10,8 +10,6 @@
+       - "Dockerfile"
+       - "entrypoint.sh"
+       - "ros_ws/src/**"
+-      - "compose.yaml"
+-      - "compose.dev.yaml"
+       - ".github/workflows/docker-image.yml"
+   pull_request:
+     branches:
+@@ -20,8 +18,6 @@
+       - "Dockerfile"
+       - "entrypoint.sh"
+       - "ros_ws/src/**"
+-      - "compose.yaml"
+-      - "compose.dev.yaml"
+       - ".github/workflows/docker-image.yml"
+ 
+ env:
+--- a/.gitignore
++++ b/.gitignore
+@@ -10,4 +10,3 @@
+ .idea/
+ .DS_Store
+ wireguard-server/
+-wireguard-server/
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -4,17 +4,14 @@
+ 
+ ENV DEBIAN_FRONTEND=noninteractive
+ ENV ROS_DISTRO=humble
+-ENV ROS_DOMAIN_ID=42
+-
+ RUN apt-get update && apt-get install -y --no-install-recommends \
+     ros-dev-tools \
+     git \
+     ca-certificates \
+     iputils-ping \
++    iproute2 \
+     net-tools \
+     ros-humble-rmw-cyclonedds-cpp \
+-    iproute2 \
+-    iputils-ping \
+     && rm -rf /var/lib/apt/lists/*
+ 
+ WORKDIR /ros_ws
+--- a/README.md
++++ b/README.md
+@@ -1,74 +1,90 @@
+ # Jacht ROS Server
+ 
+-ROS 2 Humble server for the Jachtseizoen robot swarm project.
++Containerized ROS 2 Humble server for the Jachtseizoen robot swarm project.
+ 
+-This container runs the ROS-TCP-Endpoint so Unity can connect to the ROS 2 server over TCP port 10000.
++This stack runs:
+ 
+-## Run the server
++- `jacht-wireguard-server`: WireGuard network namespace for remote ROS 2 nodes.
++- `jacht-ros-server`: Unity ROS-TCP-Endpoint on TCP `10000`.
++- `micro-ros-agent-udp`: micro-ROS Agent for Pico robots on UDP `8888`.
+ 
++The ROS containers share the WireGuard container network namespace and use CycloneDDS on `wg0`.
+ 
+-Create or use the provided compose.yaml file
++## Prerequisites
+ 
+-``` yaml
++- Docker + Docker Compose.
++- Router/firewall forwards external UDP `51821` to this server.
++- A WireGuard server config exists at `wireguard-server/`.
++- `wireguard-server/` must not be committed because it contains private keys.
+ 
+-services:
+-  jacht-ros-server:
+-    image: ghcr.io/tinlas03-2025-vt/server:latest
+-    container_name: jacht-ros-server
+-    restart: unless-stopped
+-    environment:
+-      - ROS_DOMAIN_ID=42
+-    ports:
+-      - "10000:10000/tcp"
++## First-time WireGuard setup
++
++Start the WireGuard service once to generate peer configs:
++
++```bash
++docker compose up -d wireguard-server
++find wireguard-server -name "*.conf"
+ ```
+ 
+-then run:
++Send each tracker user their own peer config. They should save it as:
+ 
+-    docker compose pull
+-    docker compose up -d
++```text
++wireguard-client/wg_confs/wg0.conf
++```
+ 
+-The ROS TCP endpoint listens on:
++## Production run
+ 
+-    <server-ip>:10000
++The main ROS server image is published by GitHub Actions as:
+ 
+-## View logs
++```text
++ghcr.io/tinlas03-2025-vt/server:latest
++```
+ 
+-    docker compose logs -f
++Run:
+ 
+-## Stop the server
++```bash
++docker compose pull
++docker compose up -d --build
++```
+ 
+-    docker compose down
++`--build` is still used because the small `micro-ros-agent-udp` compatibility image is built locally.
+ 
+-## Local development
++## Logs
+ 
+-Use the development compose file:
++```bash
++docker logs -f jacht-wireguard-server
++docker logs -f jacht-ros-server
++docker logs -f micro-ros-agent-udp
++```
+ 
+-    docker compose -f compose.dev.yaml run --rm --service-ports jacht-ros-dev
++## Test ROS topics
+ 
+-Inside the development container:
++```bash
++docker exec -it jacht-ros-server bash
++source /opt/ros/humble/setup.bash
++[ -f /ros_ws/install/setup.bash ] && source /ros_ws/install/setup.bash
++ros2 topic list -t
++```
+ 
+-    colcon build --merge-install
+-    source install/setup.bash
+-    ros2 interface list | grep jacht
++## Unity
++
++Unity connects to:
++
++```text
++<server-ip>:10000
++```
++
++## Pico / micro-ROS
++
++Pico firmware connects to:
++
++```text
++<server-ip>:8888 UDP
++```
+ 
+ ## Add a custom message
+ 
+-1. Add a .msg file to:
+-
+-       ros_ws/src/jacht_msgs/msg/
+-
+-2. Add the new .msg file to:
+-
+-       ros_ws/src/jacht_msgs/CMakeLists.txt
+-
+-3. Test locally.
+-
+-4. Commit and push.
+-
+-5. GitHub Actions will build and publish the new Docker image.
+-
+-## Image
+-
+-The published image is:
+-
+-    ghcr.io/tinlas03-2025-vt/server:latest
++1. Add the `.msg` file to `ros_ws/src/jacht_msgs/msg/`.
++2. Add it to `ros_ws/src/jacht_msgs/CMakeLists.txt`.
++3. Commit and push.
++4. GitHub Actions builds and publishes a new server image.
+--- a/compose.yaml
++++ b/compose.yaml
+@@ -27,10 +27,7 @@
+       - "8888:8888/udp"
+ 
+   jacht-ros-server:
+-    build:
+-      context: .
+-      dockerfile: Dockerfile
+-    image: jacht-ros-server:cyclone-local
++    image: ghcr.io/tinlas03-2025-vt/server:latest
+     container_name: jacht-ros-server
+     restart: unless-stopped
+     network_mode: service:wireguard-server

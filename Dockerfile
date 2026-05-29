@@ -4,17 +4,14 @@ SHELL ["/bin/bash", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=humble
-ENV ROS_DOMAIN_ID=42
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-dev-tools \
     git \
     ca-certificates \
     iputils-ping \
+    iproute2 \
     net-tools \
     ros-humble-rmw-cyclonedds-cpp \
-    iproute2 \
-    iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /ros_ws

@@ -27,10 +27,7 @@ services:
       - "8888:8888/udp"
 
   jacht-ros-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: jacht-ros-server:cyclone-local
+    image: ghcr.io/tinlas03-2025-vt/server:latest
     container_name: jacht-ros-server
     restart: unless-stopped
     network_mode: service:wireguard-server

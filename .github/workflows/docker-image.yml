@@ -10,8 +10,6 @@ on:
       - "Dockerfile"
       - "entrypoint.sh"
       - "ros_ws/src/**"
-      - "compose.yaml"
-      - "compose.dev.yaml"
       - ".github/workflows/docker-image.yml"
   pull_request:
     branches:
@@ -20,8 +18,6 @@ on:
       - "Dockerfile"
       - "entrypoint.sh"
       - "ros_ws/src/**"
-      - "compose.yaml"
-      - "compose.dev.yaml"
       - ".github/workflows/docker-image.yml"
 
 env:
