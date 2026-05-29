@@ -3,7 +3,6 @@ services:
     image: lscr.io/linuxserver/wireguard:latest
     container_name: jacht-wireguard-server
     restart: unless-stopped
-    network_mode: host
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -21,7 +20,11 @@ services:
       - LOG_CONFS=false
     volumes:
       - ./wireguard-server:/config
-      - /lib/modules:/lib/modules
+      - /lib/modules:/lib/modules:ro
+    ports:
+      - "51821:51820/udp"
+      - "10000:10000/tcp"
+      - "8888:8888/udp"
 
   jacht-ros-server:
     build:
@@ -30,7 +33,7 @@ services:
     image: jacht-ros-server:cyclone-local
     container_name: jacht-ros-server
     restart: unless-stopped
-    network_mode: host
+    network_mode: service:wireguard-server
     depends_on:
       - wireguard-server
     volumes:
@@ -44,11 +47,11 @@ services:
       bash -lc "
       source /opt/ros/humble/setup.bash &&
       [ -f /ros_ws/install/setup.bash ] && source /ros_ws/install/setup.bash;
-      until [ -e /sys/class/net/wg0 ] && grep -q '10.13.13.1' /proc/net/fib_trie; do
-        echo 'waiting for wg0 10.13.13.1...';
+      until [ -e /sys/class/net/wg0 ] && ip addr show wg0 | grep -q 'inet 10.13.13.1'; do
+        echo 'waiting for contained wg0 10.13.13.1...';
         sleep 1;
       done;
-      echo 'server wg0 ready';
+      echo 'jacht-ros-server contained wg0 ready';
       ip addr show wg0;
       ros2 run ros_tcp_endpoint default_server_endpoint
       --ros-args
@@ -62,10 +65,9 @@ services:
     image: jacht-micro-ros-agent:humble-cyclone
     container_name: micro-ros-agent-udp
     restart: unless-stopped
-    network_mode: host
+    network_mode: service:wireguard-server
     depends_on:
       - wireguard-server
-      - jacht-ros-server
     volumes:
       - ./cyclonedds:/cyclonedds:ro
     environment:
@@ -77,9 +79,9 @@ services:
     command: >
       "source /opt/ros/humble/setup.bash &&
       [ -f /uros_ws/install/setup.bash ] && source /uros_ws/install/setup.bash;
-      until [ -e /sys/class/net/wg0 ] && grep -q '10.13.13.1' /proc/net/fib_trie; do
-        echo 'waiting for wg0 10.13.13.1...';
+      until [ -e /sys/class/net/wg0 ] && ip addr show wg0 | grep -q 'inet 10.13.13.1'; do
+        echo 'waiting for contained wg0 10.13.13.1...';
         sleep 1;
       done;
-      echo 'micro-ROS agent starting on UDP 8888';
+      echo 'micro-ROS agent contained wg0 ready';
       exec ros2 run micro_ros_agent micro_ros_agent udp4 --port 8888 -v6"
