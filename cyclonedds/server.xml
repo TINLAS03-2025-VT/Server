@@ -1,15 +1,15 @@
 <CycloneDDS>
   <Domain id="any">
     <General>
-      <NetworkInterfaceAddress>wg0</NetworkInterfaceAddress>
+      <Interfaces>
+        <NetworkInterface name="wg0" multicast="false"/>
+      </Interfaces>
       <AllowMulticast>false</AllowMulticast>
     </General>
 
     <Discovery>
       <ParticipantIndex>auto</ParticipantIndex>
       <Peers>
-        <Peer Address="10.13.13.2"/>
-	<Peer Address="10.13.13.3"/>
       </Peers>
     </Discovery>
 
