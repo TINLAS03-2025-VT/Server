@@ -27,6 +27,9 @@ services:
       - "8888:8888/udp"
 
   jacht-ros-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ghcr.io/tinlas03-2025-vt/server:latest
     container_name: jacht-ros-server
     restart: unless-stopped
@@ -88,3 +91,32 @@ services:
       done;
       echo 'micro-ROS agent contained wg0 ready';
       exec ros2 run micro_ros_agent micro_ros_agent udp4 --port 8888 -v6"
+
+  pose-relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/tinlas03-2025-vt/server:latest
+    container_name: pose-relay
+    restart: unless-stopped
+    network_mode: service:wireguard-server
+    depends_on:
+      - wireguard-server
+    volumes:
+      - ./cyclonedds:/cyclonedds:ro
+    environment:
+      - ROS_DOMAIN_ID=0
+      - ROS_LOCALHOST_ONLY=0
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///cyclonedds/server.xml
+    command: >
+      bash -lc "
+      source /opt/ros/humble/setup.bash &&
+      [ -f /ros_ws/install/setup.bash ] && source /ros_ws/install/setup.bash;
+      until [ -e /sys/class/net/wg0 ] && ip addr show wg0 | grep -q 'inet 10.13.13.1'; do
+        echo 'pose-relay waiting for contained wg0 10.13.13.1...';
+        sleep 1;
+      done;
+      echo 'pose-relay contained wg0 ready';
+      exec ros2 run topic_tools relay /cam/pos /robots/pos --ros-args -r __node:=cam_pos_to_robots_pos_relay
+      "

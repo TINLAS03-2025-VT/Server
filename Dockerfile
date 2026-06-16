@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iproute2 \
     net-tools \
     ros-humble-rmw-cyclonedds-cpp \
+    ros-humble-topic-tools \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /ros_ws
