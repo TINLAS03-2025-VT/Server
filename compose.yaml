@@ -25,11 +25,12 @@ services:
       - "51821:51820/udp"
       - "10000:10000/tcp"
       - "8888:8888/udp"
+      - "18080:18080/tcp"
 
   jacht-ros-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
+#    build:
+ #     context: .
+  #    dockerfile: Dockerfile
     image: ghcr.io/tinlas03-2025-vt/server:latest
     container_name: jacht-ros-server
     restart: unless-stopped
@@ -90,16 +91,44 @@ services:
         sleep 1;
       done;
       echo 'micro-ROS agent contained wg0 ready';
-      exec ros2 run micro_ros_agent micro_ros_agent udp4 --port 8888 -v6"
+      exec ros2 run micro_ros_agent micro_ros_agent udp4 --port 8888"
 
-  pose-relay:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: ghcr.io/tinlas03-2025-vt/server:latest
-    container_name: pose-relay
+#   pose-relay:
+# #    build:
+#  #     context: .
+#   #    dockerfile: Dockerfile
+#     image: ghcr.io/tinlas03-2025-vt/server:latest
+#     container_name: pose-relay
+#     restart: unless-stopped
+#     network_mode: service:wireguard-server
+#     depends_on:
+#       - wireguard-server
+#     volumes:
+#       - ./cyclonedds:/cyclonedds:ro
+#     environment:
+#       - ROS_DOMAIN_ID=0
+#       - ROS_LOCALHOST_ONLY=0
+#       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+#       - CYCLONEDDS_URI=file:///cyclonedds/server.xml
+#     command: >
+#       bash -lc "
+#       source /opt/ros/humble/setup.bash &&
+#       [ -f /ros_ws/install/setup.bash ] && source /ros_ws/install/setup.bash;
+#       until [ -e /sys/class/net/wg0 ] && ip addr show wg0 | grep -q 'inet 10.13.13.1'; do
+#         echo 'pose-relay waiting for contained wg0 10.13.13.1...';
+#         sleep 1;
+#       done;
+#       echo 'pose-relay contained wg0 ready';
+#       exec ros2 run topic_tools relay /unity/pos /robots/pos --ros-args -r __node:=cam_pos_to_robots_pos_relay
+#       "
+  game-master:
+    image: ghcr.io/tinlas03-2025-vt/game-master:latest
+    container_name: game-master
     restart: unless-stopped
     network_mode: service:wireguard-server
+    stdin_open: true
+    # Equivalent to -t
+    tty: true
     depends_on:
       - wireguard-server
     volumes:
@@ -112,11 +141,55 @@ services:
     command: >
       bash -lc "
       source /opt/ros/humble/setup.bash &&
-      [ -f /ros_ws/install/setup.bash ] && source /ros_ws/install/setup.bash;
-      until [ -e /sys/class/net/wg0 ] && ip addr show wg0 | grep -q 'inet 10.13.13.1'; do
-        echo 'pose-relay waiting for contained wg0 10.13.13.1...';
+      until [ -e /sys/class/net/wg0 ] &&
+            ip addr show wg0 | grep -q 'inet 10.13.13.' &&
+            ip route get 10.13.13.1 >/dev/null 2>&1; do
+        echo 'game-master waiting for contained wg0 and route to 10.13.13.1...';
         sleep 1;
       done;
-      echo 'pose-relay contained wg0 ready';
-      exec ros2 run topic_tools relay /cam/pos /robots/pos --ros-args -r __node:=cam_pos_to_robots_pos_relay
+      echo 'game-master contained wg0 ready';
+      ip addr show wg0;
+      exec python3 src/game_master_node.py
       "
+  robot-position-merger:
+    image: ghcr.io/tinlas03-2025-vt/game-master:latest
+    container_name: robot-position-merger
+    restart: unless-stopped
+    network_mode: service:wireguard-server
+    depends_on:
+      - wireguard-server
+    volumes:
+      - ./cyclonedds:/cyclonedds:ro
+    environment:
+      - ROS_DOMAIN_ID=0
+      - ROS_LOCALHOST_ONLY=0
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///cyclonedds/server.xml
+      - NODE_NAME=robot_position_merger
+      # - UNITY_POS_TOPIC=/unity/pos
+      # - CAM_POS_TOPIC=/cam/pos
+      # - ROBOTS_POS_TOPIC=/robots/pos
+      # - OUTPUT_FRAME_ID=map
+      # # - PUBLISH_RATE_HZ=10.0
+      # # - MAX_POSE_AGE_SEC=1.0
+    command: >
+      bash -lc "
+      source /opt/ros/humble/setup.bash &&
+      until [ -e /sys/class/net/wg0 ] &&
+            ip addr show wg0 | grep -q 'inet 10.13.13.' &&
+            ip route get 10.13.13.1 >/dev/null 2>&1; do
+        echo 'robot-position-merger waiting for contained wg0 and route to 10.13.13.1...';
+        sleep 1;
+      done;
+      echo 'robot-position-merger contained wg0 ready';
+      exec python3 src/robot_position_merger_node.py
+      "
+
+  tracker-ui-proxy:
+    image: alpine/socat
+    container_name: tracker-ui-proxy
+    restart: unless-stopped
+    network_mode: service:wireguard-server
+    depends_on:
+      - wireguard-server
+    command: TCP-LISTEN:18080,fork,reuseaddr,bind=0.0.0.0 TCP:10.13.13.2:8080

@@ -1,0 +1,69 @@
+services:
+  game-master:
+    image: ghcr.io/tinlas03-2025-vt/game-master:latest
+    container_name: game-master
+    restart: "no"
+    network_mode: service:wireguard-server
+    stdin_open: true
+    tty: true
+    depends_on:
+      - wireguard-server
+    volumes:
+      - ./cyclonedds:/cyclonedds:ro
+      - ../Game-master/src:/app/src
+    environment:
+      - ROS_DOMAIN_ID=0
+      - ROS_LOCALHOST_ONLY=0
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - SEEN_DISTANCE=3.0
+      - LOSE_DISTANCE=3.5
+      - SEEN_HALF_FOV_DEGREES=20.0
+      - TIMER_PERIOD_SEC=0.01
+      - CYCLONEDDS_URI=file:///cyclonedds/server.xml
+    command: >
+      bash -lc "
+      source /opt/ros/humble/setup.bash &&
+      until [ -e /sys/class/net/wg0 ] &&
+            ip addr show wg0 | grep -q 'inet 10.13.13.1' &&
+            ip route get 10.13.13.1 >/dev/null 2>&1; do
+        echo 'game-master waiting for contained wg0 10.13.13.1...';
+        sleep 1;
+      done;
+      echo 'game-master dev contained wg0 ready';
+      ip addr show wg0;
+      exec python3 src/game_master_node.py
+      "
+  #      exec python3 src/game_master_node.py --ros-args --log-level game_master:=debug
+
+  robot-position-merger:
+    image: ghcr.io/tinlas03-2025-vt/game-master:latest
+    container_name: robot-position-merger
+    restart: "no"
+    network_mode: service:wireguard-server
+    depends_on:
+      - wireguard-server
+    volumes:
+      - ./cyclonedds:/cyclonedds:ro
+      - ../Game-master/src:/app/src
+    environment:
+      - ROS_DOMAIN_ID=0
+      - ROS_LOCALHOST_ONLY=0
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///cyclonedds/server.xml
+      - NODE_NAME=robot_position_merger
+      - UNITY_POS_TOPIC=/unity/pos
+      - CAM_POS_TOPIC=/cam/pos
+      - ROBOTS_POS_TOPIC=/robots/pos
+      - OUTPUT_FRAME_ID=map
+    command: >
+      bash -lc "
+      source /opt/ros/humble/setup.bash &&
+      until [ -e /sys/class/net/wg0 ] &&
+            ip addr show wg0 | grep -q 'inet 10.13.13.1' &&
+            ip route get 10.13.13.1 >/dev/null 2>&1; do
+        echo 'robot-position-merger waiting for contained wg0 10.13.13.1...';
+        sleep 1;
+      done;
+      echo 'robot-position-merger dev contained wg0 ready';
+      exec python3 src/robot_position_merger_node.py
+      "
